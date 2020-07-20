@@ -75,6 +75,33 @@ fn expanded_contract<T: Trait>(expansions: u32) -> (Vec<u8>, <T::Hashing as Hash
     compile_code::<T>(&contract)
 }
 
+fn expanded_contract_nested<T: Trait>(expansions: u32) -> (Vec<u8>, <T::Hashing as Hash>::Output) {
+    let expansions = expansions as usize;
+    const CONTRACT_START: &str = r#"
+        (module
+            (func (export "deploy"))
+            (func (export "call")
+
+    "#;
+    const CONTRACT_EXP_NEST: &str = "(if (i32.const 0)";
+    const CONTRACT_INNER: &str = "(return)";
+    const CONTRACT_EXP_RESOLVE: &str = ")";
+    const CONTRACT_END: &str = "))";
+    let expansion_len = (CONTRACT_EXP_NEST.len() + CONTRACT_EXP_RESOLVE.len()) * expansions;
+    let len = CONTRACT_START.len() + expansion_len + CONTRACT_END.len() + CONTRACT_INNER.len();
+    let mut contract = String::with_capacity(len);
+    contract.push_str(CONTRACT_START);
+    for _ in 1 .. expansions {
+        contract.push_str(CONTRACT_EXP_NEST);
+    }
+    contract.push_str(CONTRACT_INNER);
+    for _ in 1 .. expansions {
+        contract.push_str(CONTRACT_EXP_RESOLVE);
+    }
+    contract.push_str(CONTRACT_END);
+    compile_code::<T>(&contract)
+}
+
 benchmarks! {
     _ {
     }
@@ -84,6 +111,12 @@ benchmarks! {
         let caller = create_max_funded_user::<T>("caller", 0);
         let (binary, hash) = expanded_contract::<T>(n);
     }: _(RawOrigin::Signed(caller), binary)
+
+    put_code_nested {
+        let n in 0 .. 2_000;
+        let caller = create_max_funded_user::<T>("caller", 0);
+        let (binary, hash) = expanded_contract_nested::<T>(n);
+    }: put_code(RawOrigin::Signed(caller), binary)
 
     instantiate {
         // The size of the data has no influence on the costs of this extrinsic
@@ -153,6 +186,13 @@ mod tests {
     fn put_code() {
 		ExtBuilder::default().build().execute_with(|| {
 			assert_ok!(test_benchmark_put_code::<Test>());
+		});
+    }
+
+    #[test]
+    fn put_code_nested() {
+		ExtBuilder::default().build().execute_with(|| {
+			assert_ok!(test_benchmark_put_code_nested::<Test>());
 		});
     }
 
