@@ -19,12 +19,15 @@
 
 #![cfg(feature = "runtime-benchmarks")]
 
+extern crate alloc;
+
 use crate::*;
 use crate::Module as Contracts;
 
 use frame_system::RawOrigin;
 use frame_benchmarking::{benchmarks, account};
 use sp_runtime::traits::{Bounded, Hash};
+use alloc::string::String;
 
 const SEED: u32 = 0;
 
@@ -59,7 +62,7 @@ fn expanded_contract<T: Trait>(expansions: u32) -> (Vec<u8>, <T::Hashing as Hash
             (func (export "call")
 
     "#;
-    const CONTRACT_EXPANSION: &str = "(block (nop))\n";
+    const CONTRACT_EXPANSION: &str = "( if (i32.const 0) (then (return)) )";
     const CONTRACT_END: &str = "))";
     let expansion_len = CONTRACT_EXPANSION.len() * expansions as usize;
     let len = CONTRACT_START.len() + expansion_len + CONTRACT_END.len();
@@ -77,7 +80,7 @@ benchmarks! {
     }
 
     put_code {
-        let n in 0 .. 65_000;
+        let n in 0 .. 2_000;
         let caller = create_max_funded_user::<T>("caller", 0);
         let (binary, hash) = expanded_contract::<T>(n);
     }: _(RawOrigin::Signed(caller), binary)
